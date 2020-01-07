@@ -9,7 +9,7 @@ export {
   getSelectedAttribute
 } from "./selection";
 export {
-  exportAsPNG,
+  exportCanvas,
   loadFromJSON,
   saveAsJSON,
   restoreFromLocalStorage,

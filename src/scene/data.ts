@@ -13,6 +13,15 @@ import {
 import { renderScene } from "./render";
 import { AppState } from "../types";
 
+declare global {
+  interface Window {
+    ClipboardItem: any;
+  }
+  interface Clipboard extends EventTarget {
+    write(data: any[]): Promise<void>;
+  }
+}
+
 const LOCAL_STORAGE_KEY = "excalidraw";
 const LOCAL_STORAGE_KEY_STATE = "excalidraw-state";
 
@@ -68,7 +77,8 @@ export function loadFromJSON(elements: ExcalidrawElement[]) {
   });
 }
 
-export function exportAsPNG(
+export function exportCanvas(
+  type: string,
   elements: ExcalidrawElement[],
   canvas: HTMLCanvasElement,
   {
@@ -127,7 +137,23 @@ export function exportAsPNG(
     }
   );
 
-  saveFile(`${name}.png`, tempCanvas.toDataURL("image/png"));
+  if (type === "png") {
+    saveFile(`${name}.png`, tempCanvas.toDataURL("image/png"));
+  } else if (type === "clipboard") {
+    try {
+      tempCanvas.toBlob(async function(blob) {
+        try {
+          await navigator.clipboard.write([
+            new window.ClipboardItem({ "image/png": blob })
+          ]);
+        } catch (err) {
+          window.alert("Couldn't copy to clipboard. Try using Chrome browser.");
+        }
+      });
+    } catch (err) {
+      window.alert("Couldn't copy to clipboard. Try using Chrome browser.");
+    }
+  }
 
   // clean up the DOM
   if (tempCanvas !== canvas) tempCanvas.remove();

@@ -16,7 +16,7 @@ import {
   getSelectedAttribute,
   loadFromJSON,
   saveAsJSON,
-  exportAsPNG,
+  exportCanvas,
   restoreFromLocalStorage,
   saveToLocalStorage,
   restoreFromURL,
@@ -497,7 +497,9 @@ class App extends React.Component<{}, AppState> {
           <PanelExport
             projectName={this.state.name}
             onProjectNameChange={this.updateProjectName}
-            onExportAsPNG={() => exportAsPNG(elements, canvas, this.state)}
+            onExportCanvas={(type: string) =>
+              exportCanvas(type, elements, canvas, this.state)
+            }
             exportBackground={this.state.exportBackground}
             onExportBackgroundChange={val =>
               this.setState({ exportBackground: val })
