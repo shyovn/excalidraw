@@ -5,14 +5,21 @@ import {
   UpdaterFn,
   ActionName,
   ActionResult,
+  PanelComponentProps,
 } from "./types";
 import { ExcalidrawElement } from "../element/types";
 import { AppProps, AppState } from "../types";
 import { MODES } from "../constants";
+import Library from "../data/library";
 
 // This is the <App> component, but for now we don't care about anything but its
 // `canvas` state.
-type App = { canvas: HTMLCanvasElement | null; props: AppProps };
+type App = {
+  canvas: HTMLCanvasElement | null;
+  focusContainer: () => void;
+  props: AppProps;
+  library: Library;
+};
 
 export class ActionManager implements ActionsManagerInterface {
   actions = {} as ActionsManagerInterface["actions"];
@@ -51,7 +58,7 @@ export class ActionManager implements ActionsManagerInterface {
     actions.forEach((action) => this.registerAction(action));
   }
 
-  handleKeyDown(event: KeyboardEvent) {
+  handleKeyDown(event: React.KeyboardEvent | KeyboardEvent) {
     const canvasActions = this.app.props.UIOptions.canvasActions;
     const data = Object.values(this.actions)
       .sort((a, b) => (b.keyPriority || 0) - (a.keyPriority || 0))
@@ -101,11 +108,10 @@ export class ActionManager implements ActionsManagerInterface {
     );
   }
 
-  // Id is an attribute that we can use to pass in data like keys.
-  // This is needed for dynamically generated action components
-  // like the user list. We can use this key to extract more
-  // data from app state. This is an alternative to generic prop hell!
-  renderAction = (name: ActionName, id?: string) => {
+  /**
+   * @param data additional data sent to the PanelComponent
+   */
+  renderAction = (name: ActionName, data?: PanelComponentProps["data"]) => {
     const canvasActions = this.app.props.UIOptions.canvasActions;
 
     if (
@@ -133,8 +139,8 @@ export class ActionManager implements ActionsManagerInterface {
           elements={this.getElementsIncludingDeleted()}
           appState={this.getAppState()}
           updateData={updateData}
-          id={id}
           appProps={this.app.props}
+          data={data}
         />
       );
     }

@@ -8,12 +8,12 @@ import React, {
 } from "react";
 import { trackEvent } from "../analytics";
 import { getDefaultAppState } from "../appState";
-import { ExcalidrawImperativeAPI } from "../components/App";
 import { ErrorDialog } from "../components/ErrorDialog";
 import { TopErrorBoundary } from "../components/TopErrorBoundary";
 import {
   APP_NAME,
   EVENT,
+  STORAGE_KEYS,
   TITLE_TIMEOUT,
   URL_HASH_KEYS,
   VERSION_TIMEOUT,
@@ -30,7 +30,7 @@ import Excalidraw, {
   defaultLang,
   languages,
 } from "../packages/excalidraw/index";
-import { AppState } from "../types";
+import { AppState, LibraryItems, ExcalidrawImperativeAPI } from "../types";
 import {
   debounce,
   getVersion,
@@ -50,7 +50,12 @@ import {
   saveToLocalStorage,
 } from "./data/localStorage";
 import CustomStats from "./CustomStats";
-import { RestoredDataState } from "../data/restore";
+import { restoreAppState, RestoredDataState } from "../data/restore";
+import { Tooltip } from "../components/Tooltip";
+import { shield } from "../components/icons";
+
+import "./index.scss";
+import { ExportToExcalidrawPlus } from "./components/ExportToExcalidrawPlus";
 
 const languageDetector = new LanguageDetector();
 languageDetector.init({
@@ -136,7 +141,7 @@ const initializeScene = async (opts: {
     const url = externalUrlMatch[1];
     try {
       const request = await fetch(window.decodeURIComponent(url));
-      const data = await loadFromBlob(await request.blob(), null);
+      const data = await loadFromBlob(await request.blob(), null, null);
       if (
         !scene.elements.length ||
         window.confirm(t("alerts.loadSceneOverridePrompt"))
@@ -159,6 +164,20 @@ const initializeScene = async (opts: {
   }
   return null;
 };
+
+const PlusLinkJSX = (
+  <p style={{ direction: "ltr", unicodeBidi: "embed" }}>
+    Introducing Excalidraw+
+    <br />
+    <a
+      href="https://plus.excalidraw.com/?utm_source=excalidraw&utm_medium=banner&utm_campaign=launch"
+      target="_blank"
+      rel="noreferrer"
+    >
+      Try out now!
+    </a>
+  </p>
+);
 
 const ExcalidrawWrapper = () => {
   const [errorMessage, setErrorMessage] = useState("");
@@ -195,6 +214,18 @@ const ExcalidrawWrapper = () => {
     }
 
     initializeScene({ collabAPI }).then((scene) => {
+      if (scene) {
+        try {
+          scene.libraryItems =
+            JSON.parse(
+              localStorage.getItem(
+                STORAGE_KEYS.LOCAL_STORAGE_LIBRARY,
+              ) as string,
+            ) || [];
+        } catch (e) {
+          console.error(e);
+        }
+      }
       initialStatePromiseRef.current.promise.resolve(scene);
     });
 
@@ -212,7 +243,10 @@ const ExcalidrawWrapper = () => {
       } else {
         initializeScene({ collabAPI }).then((scene) => {
           if (scene) {
-            excalidrawAPI.updateScene(scene);
+            excalidrawAPI.updateScene({
+              ...scene,
+              appState: restoreAppState(scene.appState, null),
+            });
           }
         });
       }
@@ -277,27 +311,86 @@ const ExcalidrawWrapper = () => {
     }
   };
 
+  const renderTopRightUI = useCallback(
+    (isMobile: boolean, appState: AppState) => {
+      return (
+        <div
+          style={{
+            width: "24ch",
+            fontSize: "0.7em",
+            textAlign: "center",
+          }}
+        >
+          {/* <GitHubCorner theme={appState.theme} dir={document.dir} /> */}
+          {/* FIXME remove after 2021-05-20 */}
+          {PlusLinkJSX}
+        </div>
+      );
+    },
+    [],
+  );
+
   const renderFooter = useCallback(
     (isMobile: boolean) => {
+      const renderEncryptedIcon = () => (
+        <a
+          className="encrypted-icon tooltip"
+          href="https://blog.excalidraw.com/end-to-end-encryption/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("encrypted.link")}
+        >
+          <Tooltip label={t("encrypted.tooltip")} long={true}>
+            {shield}
+          </Tooltip>
+        </a>
+      );
+
       const renderLanguageList = () => (
         <LanguageList
-          onChange={(langCode) => {
-            setLangCode(langCode);
-          }}
+          onChange={(langCode) => setLangCode(langCode)}
           languages={languages}
-          floating={!isMobile}
           currentLangCode={langCode}
         />
       );
       if (isMobile) {
+        const isTinyDevice = window.innerWidth < 362;
         return (
-          <fieldset>
-            <legend>{t("labels.language")}</legend>
-            {renderLanguageList()}
-          </fieldset>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: isTinyDevice ? "column" : "row",
+            }}
+          >
+            <fieldset>
+              <legend>{t("labels.language")}</legend>
+              {renderLanguageList()}
+            </fieldset>
+            {/* FIXME remove after 2021-05-20 */}
+            <div
+              style={{
+                width: "24ch",
+                fontSize: "0.7em",
+                textAlign: "center",
+                marginTop: isTinyDevice ? 16 : undefined,
+                marginLeft: "auto",
+                marginRight: isTinyDevice ? "auto" : undefined,
+                padding: "4px 2px",
+                border: "1px dashed #aaa",
+                borderRadius: 12,
+              }}
+            >
+              {PlusLinkJSX}
+            </div>
+          </div>
         );
       }
-      return renderLanguageList();
+      return (
+        <>
+          {renderEncryptedIcon()}
+          {renderLanguageList()}
+        </>
+      );
     },
     [langCode],
   );
@@ -310,6 +403,15 @@ const ExcalidrawWrapper = () => {
     );
   };
 
+  const onLibraryChange = async (items: LibraryItems) => {
+    if (!items.length) {
+      localStorage.removeItem(STORAGE_KEYS.LOCAL_STORAGE_LIBRARY);
+      return;
+    }
+    const serializedItems = JSON.stringify(items);
+    localStorage.setItem(STORAGE_KEYS.LOCAL_STORAGE_LIBRARY, serializedItems);
+  };
+
   return (
     <>
       <Excalidraw
@@ -319,11 +421,36 @@ const ExcalidrawWrapper = () => {
         onCollabButtonClick={collabAPI?.onCollabButtonClick}
         isCollaborating={collabAPI?.isCollaborating()}
         onPointerUpdate={collabAPI?.onPointerUpdate}
-        onExportToBackend={onExportToBackend}
+        UIOptions={{
+          canvasActions: {
+            export: {
+              onExportToBackend,
+              renderCustomUI: (elements, appState) => {
+                return (
+                  <ExportToExcalidrawPlus
+                    elements={elements}
+                    appState={appState}
+                    onError={(error) => {
+                      excalidrawAPI?.updateScene({
+                        appState: {
+                          errorMessage: error.message,
+                        },
+                      });
+                    }}
+                  />
+                );
+              },
+            },
+          },
+        }}
+        renderTopRightUI={renderTopRightUI}
         renderFooter={renderFooter}
         langCode={langCode}
         renderCustomStats={renderCustomStats}
         detectScroll={false}
+        handleKeyboardGlobally={true}
+        onLibraryChange={onLibraryChange}
+        autoFocus={true}
       />
       {excalidrawAPI && <CollabWrapper excalidrawAPI={excalidrawAPI} />}
       {errorMessage && (

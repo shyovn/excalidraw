@@ -5,10 +5,11 @@ import {
   ExcalidrawGenericElement,
   NonDeleted,
   TextAlign,
-  FontFamily,
   GroupId,
   VerticalAlign,
   Arrowhead,
+  ExcalidrawFreeDrawElement,
+  FontFamilyValues,
 } from "../element/types";
 import { measureText, getFontString } from "../utils";
 import { randomInteger, randomId } from "../random";
@@ -108,7 +109,7 @@ export const newTextElement = (
   opts: {
     text: string;
     fontSize: number;
-    fontFamily: FontFamily;
+    fontFamily: FontFamilyValues;
     textAlign: TextAlign;
     verticalAlign: VerticalAlign;
   } & ElementConstructorOpts,
@@ -212,6 +213,22 @@ export const updateTextElement = (
   });
 };
 
+export const newFreeDrawElement = (
+  opts: {
+    type: "freedraw";
+    points?: ExcalidrawFreeDrawElement["points"];
+    simulatePressure: boolean;
+  } & ElementConstructorOpts,
+): NonDeleted<ExcalidrawFreeDrawElement> => {
+  return {
+    ..._newElementBase<ExcalidrawFreeDrawElement>(opts.type, opts),
+    points: opts.points || [],
+    pressures: [],
+    simulatePressure: opts.simulatePressure,
+    lastCommittedPoint: null,
+  };
+};
+
 export const newLinearElement = (
   opts: {
     type: ExcalidrawLinearElement["type"];
@@ -290,7 +307,19 @@ export const duplicateElement = <TElement extends Mutable<ExcalidrawElement>>(
   overrides?: Partial<TElement>,
 ): TElement => {
   let copy: TElement = deepCopyElement(element);
-  copy.id = process.env.NODE_ENV === "test" ? `${copy.id}_copy` : randomId();
+  if (process.env.NODE_ENV === "test") {
+    copy.id = `${copy.id}_copy`;
+    // `window.h` may not be defined in some unit tests
+    if (
+      window.h?.app
+        ?.getSceneElementsIncludingDeleted()
+        .find((el) => el.id === copy.id)
+    ) {
+      copy.id += "_copy";
+    }
+  } else {
+    copy.id = randomId();
+  }
   copy.seed = randomInteger();
   copy.groupIds = getNewGroupIdsForDuplication(
     copy.groupIds,

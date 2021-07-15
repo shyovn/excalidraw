@@ -11,7 +11,7 @@ export const SHAPES = [
       </svg>
     ),
     value: "selection",
-    key: [KEYS.V, KEYS.S],
+    key: KEYS.V,
   },
   {
     icon: (
@@ -80,7 +80,7 @@ export const SHAPES = [
         ></path>
       </svg>
     ),
-    value: "draw",
+    value: "freedraw",
     key: KEYS.X,
   },
   {
